@@ -1,0 +1,10 @@
+node_modules/
+*/node_modules/
+*.log
+.DS_Store
+.env*
+*.pem
+*.key
+cve-db/
+*.zip
+.claude/
