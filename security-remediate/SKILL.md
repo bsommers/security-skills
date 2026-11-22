@@ -1,6 +1,6 @@
 ---
 name: security-remediate
-version: 1.1.0
+version: 1.2.0
 description: |
   Remediates security vulnerabilities in JS, TypeScript, Python, Go, and Rust code.
   Three modes: auto-patch (edits files directly with before/after diff and CVSS
@@ -525,6 +525,104 @@ let res = client.get(url).send().await?;
 
 ---
 
+#### Fix library — Lessons learned (language-agnostic; Python shown)
+
+**Fail-open switch parsing (A05)**
+```python
+# BEFORE (insecure) — "true" silently leaves read-only OFF
+read_only = os.environ.get("READ_ONLY") == "1"
+
+# AFTER (secure) — strict, raises on unknown values
+_TRUE, _FALSE = {"1", "true", "yes", "on"}, {"0", "false", "no", "off", ""}
+def env_bool(name: str, default: bool = False) -> bool:
+    v = os.environ.get(name)
+    if v is None: return default
+    v = v.strip().lower()
+    if v in _TRUE: return True
+    if v in _FALSE: return False
+    raise ValueError(f"{name} must be one of 1/true/yes/on or 0/false/no/off")
+```
+Add a test per switch for every accepted spelling and for one invalid value.
+
+**Unmarked untrusted data to an LLM (A03/A08)**
+```python
+# AFTER — wrap every tool return path, bound each string field
+def untrusted(data, max_str=256):
+    def cut(x):
+        if isinstance(x, str): return x[:max_str]
+        if isinstance(x, list): return [cut(i) for i in x[:100]]
+        if isinstance(x, dict): return {k: cut(v) for k, v in list(x.items())[:100]}
+        return x
+    return {"untrusted": True, "data": cut(data)}
+```
+Mention in the tool docstring that the content is attacker-settable. Do not rely on the flag alone; keep allowlists.
+
+**Cleartext credentials to non-loopback http (A02)**
+```python
+from urllib.parse import urlparse
+def require_safe_url(url: str, has_credentials: bool) -> None:
+    u = urlparse(url)
+    if has_credentials and u.scheme != "https" and u.hostname not in {"localhost", "127.0.0.1", "::1"}:
+        raise ValueError("refusing to send credentials over cleartext http to a non-loopback host")
+```
+Put the guard in one shared helper used by every client path.
+
+**Sync call blocking the event loop (A04)**
+```python
+# BEFORE: def tool(): return httpx.get(url).json()      # inline on the loop
+# AFTER:
+async def tool():
+    return await asyncio.to_thread(lambda: httpx.get(url, timeout=5).json())
+```
+Go: run blocking work in a goroutine with context; Rust: `tokio::task::spawn_blocking`.
+
+**Truncation and size misreport (A04)**
+```python
+raw_len = len(raw)                      # keep the TRUE size
+cut = raw[:limit]
+text = cut.decode("utf-8", errors="ignore")   # drops a trailing partial sequence
+return {"bytes": raw_len, "truncated": raw_len > limit, "text": text}
+```
+Check the cap before decoding or buffering the full payload where the transport allows it.
+
+**Hand-rolled JSON logging (A09)**
+```python
+# BEFORE: fmt='{"level":"%(levelname)s","msg":"%(message)s"}'
+# AFTER:
+class JsonFormatter(logging.Formatter):
+    def format(self, r):
+        return json.dumps({"level": r.levelname, "msg": r.getMessage(), "logger": r.name})
+```
+For stdio MCP servers send logs to stderr only.
+
+**Error leakage and leaked sockets (A05)**
+Wrap client construction and connect in the same `try`; catch `OSError`/`ssl.SSLError`, raise a domain error with a generic message (no paths), and close the client in a `finally`.
+
+**Missing CI gates (A06/A08)** — minimal GitHub Actions gate:
+```yaml
+name: ci
+on: [pull_request, push]
+permissions:
+  contents: read
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@<full-commit-sha>   # pin by SHA, keep the version in a comment
+      - uses: actions/setup-python@<full-commit-sha>
+        with: { python-version: "3.12" }
+      - run: pip install -e ".[dev]" pip-audit
+      - run: ruff check . && mypy --strict src && pytest -m "not integration" --cov --cov-fail-under=85
+      - run: pip-audit
+```
+Replace `<full-commit-sha>` by resolving the current release tag yourself; never invent a SHA.
+
+**Duplicated security helpers (A04)**: extract one shared module (for example `brokers/_rest.py`) and keep thin per-service profiles, so URL, auth, and wrapping fixes land once.
+
+**MCP servers**: after applying the above, verify against `secure-design-patterns` MCP-001 (no token passthrough), MCP-003 (count and byte bounds), MCP-006 (async-safe, stateless), MCP-008 (stdio frame hygiene, stderr logs). Consult the library if it is available locally; the bullets here are sufficient without it.
+
+---
+
 ### Phase 4 — Apply fixes
 
 For each finding in scope, execute the appropriate mode:
@@ -654,6 +752,8 @@ Append a remediation summary to the most recent evaluate or scan report:
 - Remaining: {N} findings
 ```
 
+*Optional*: if `security-controls` / `security-assurance` are available, list the NIST 800-53 IDs addressed and keep the remaining findings (ID, severity, location, controls, target date) in a table that can seed an OSCAL POA&M. Skip if not available; nothing here needs network access.
+
 ## Success criteria
 
 - Every fix is applied using OWASP-recommended patterns (not just symptom suppression)
@@ -662,4 +762,5 @@ Append a remediation summary to the most recent evaluate or scan report:
 - No fix introduces a new vulnerability (e.g., do not replace SQL injection with a different injection)
 - Remaining unfixed findings are clearly listed with their CVSS scores
 - All required new dependencies are listed at the end
+- Fail-open parsing, unmarked untrusted data, cleartext credentials, and blocking calls are fixed with tests that cover the new behavior
 - Remediation report is written to `.security-reports/remediate-{date}.md`

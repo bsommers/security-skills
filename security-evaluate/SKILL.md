@@ -1,6 +1,6 @@
 ---
 name: security-evaluate
-version: 1.1.0
+version: 1.2.0
 description: |
   Deep security evaluation of JS, TypeScript, Python, Go, and Rust codebases. Builds on
   /security-scan results (or triggers a fresh scan if none exist). Produces a
@@ -151,6 +151,22 @@ For each of the 10 OWASP Top 10 2021 categories, report:
 - Positive controls present that mitigate this category
 - Net risk level for this category: Mitigated / Partial / Exposed
 
+### Phase 6b — Class-level checks (lessons learned)
+
+Beyond per-finding scores, check whether these systemic gaps exist and record each as a finding if the scan did not:
+- Fail-open parsing of any security switch (only one literal value, e.g. `"1"`, enables the control). Score as a misconfiguration that silently disables a defense; the operator's belief differs from the real state, so rate Integrity/Confidentiality impact High when the switch is read-only/TLS/verify.
+- Untrusted data from secondary APIs reaching an LLM without marking or bounds.
+- Credentialed http to non-loopback hosts on any client path.
+- Sync handlers on an async loop (availability, `A:L`-`A:H` depending on blocking time).
+- Missing CI gates (lint, types, tests, dependency audit, least-privilege token). Treat as a process finding: no CVSS vector, classify as Quick Win or Plan Soon by effort.
+- Balance scorecard: count a positive pattern only if enforced, not merely documented (e.g. a coverage threshold in a README but not in CI earns no credit).
+
+For MCP servers, also report coverage against `secure-design-patterns` MCP-001 (credential isolation), MCP-003 (payload bounding), MCP-006 (stateless/async safety), MCP-008 (transport hygiene) as Met / Partial / Missing.
+
+### Optional — NIST control and POA&M view
+
+If the `security-controls` and `security-assurance` repos are available locally, add a `Controls` column (800-53 r5 IDs, see the mapping table in `security-scan`) to the roadmap and keep per-finding fields (ID, severity, location, controls, effort, status) so they can feed an OSCAL POA&M. If they are not available, omit the column. Nothing here requires network access.
+
 ### Phase 7 — Generate evaluation report
 
 Write `.security-reports/evaluate-{date}.md`:
@@ -252,6 +268,8 @@ Balance:       {+N/-N}   (range: -100 to +100)
 
 ## Remediation Roadmap
 
+*(Optional: add a Controls column with NIST 800-53 IDs when available.)*
+
 1. **Immediate** (this sprint): {N} critical/high findings — estimated {X} hours
 2. **Short-term** (next sprint): {N} medium findings — estimated {X} hours
 3. **Ongoing**: Keep positive patterns, add missing controls for {categories}
@@ -275,3 +293,5 @@ Run /security-remediate to begin fixing.
 - OWASP Top 10 coverage table is complete
 - Evaluation report is written and references the scan report
 - Remediation roadmap is practical and time-estimated
+- Class-level lessons-learned checks (and the MCP pattern coverage for MCP servers) were evaluated
+- Optional control mapping is included only when available; it is never required

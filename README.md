@@ -159,6 +159,12 @@ Each skill is a `SKILL.md` file declaring its name, the tools it may use, and st
 
 ---
 
+## Optional companions
+
+The scan, evaluate, and remediate skills include checks for MCP servers and lessons from real reviews (fail-open config parsing, untrusted data reaching an LLM, cleartext credentials, event-loop blocking, log forging, missing CI gates). They can optionally reference NIST SP 800-53 control IDs from [security-controls](https://github.com/bsommers/security-controls), the MCP patterns in [secure-design-patterns](https://github.com/bsommers/secure-design-patterns) (MCP-001/003/006/008), and feed [security-assurance](https://github.com/bsommers/security-assurance) (OSCAL POA&M). None is required; the skills work offline and without them.
+
+---
+
 ## Skill Reference
 
 | Skill | Tools used | Writes files | Runs shell commands |

@@ -74,7 +74,7 @@ This downloads OSV.dev and NIST NVD API 2.0 vulnerability data and builds `~/.cl
 /security-scan
 ```
 
-Reads all `.js`, `.ts`, `.jsx`, `.tsx`, `.py`, `.go`, `.rs` files. Checks OWASP Top 10 patterns. Queries the CVE index for detected packages. Writes `.security-reports/scan-{date}.md` with a security grade.
+Reads all `.js`, `.ts`, `.jsx`, `.tsx`, `.py`, `.go`, `.rs` files. Checks OWASP Top 10 patterns. Queries the CVE index for detected packages. Writes `.security-reports/scan-{date}.md` with a security grade. It also applies the lessons-learned checks (fail-open config parsing, untrusted data to LLMs, cleartext credentials, async blocking, log forging, missing CI gates) and, for MCP servers, an MCP checklist. Optional NIST 800-53 control tags are added when `security-controls` is available.
 
 **Step 3 — Evaluate**
 
