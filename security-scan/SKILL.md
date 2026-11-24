@@ -248,13 +248,16 @@ This step is optional and has no hard dependency. Skip it silently if the tools 
 | Finding class | Typical 800-53 r5 IDs |
 |---------------|----------------------|
 | Fail-open security switch / insecure default | CM-6, CM-7, SI-10 |
-| Unmarked untrusted data to an LLM, injection | SI-10, SI-15, SC-18 |
+| Unmarked untrusted data to an LLM, injection | SI-10, SI-15 |
 | Cleartext credentials, missing TLS | SC-8, SC-13, IA-5 |
 | Blocking call / unbounded resource use | SC-5, SC-6 |
 | Truncation / size misreport, input bounds | SI-10 |
-| Log forging, missing audit fields | AU-3, AU-9, SI-11 |
+| Log forging, missing audit fields | AU-3, AU-9 |
+| Internals (paths, stack traces) leaked in errors | SI-11 |
 | Missing CI gates, no dependency audit | SA-11, SA-15, RA-5, SR-3 |
 | Wildcard allowlist, no deny-by-default | AC-3, AC-6 |
+
+IDs are valid NIST SP 800-53 r5 controls. CM-6, SC-6, SC-13, SI-11 and SI-15 are not in the 45-control `security-controls` core library, so look them up in NIST OSCAL or the full catalog rather than that library.
 
 - **Evidence hand-off**: if `security-assurance` (https://github.com/bsommers/security-assurance) is available, the report's finding table (ID, severity, file:line, control IDs, status) is suitable input for an OSCAL POA&M item. This skill does not generate OSCAL; it only keeps the fields stable so another tool can.
 
